@@ -50,7 +50,6 @@ stunnelconf+=$"[redis-cli]\n"
 stunnelconf+=$"client=yes\n"
 stunnelconf+=$"accept=127.0.0.1:$LOCALPORT\n"
 stunnelconf+=$"verifyChain=yes\n"
-
 stunnelconf+=$"checkHost=$host\n"
 stunnelconf+=$"CAfile=$lechain\n"
 stunnelconf+=$"connect=$hostport\n"
