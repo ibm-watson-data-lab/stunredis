@@ -60,13 +60,11 @@ stunnelconf+=$"connect=$hostport\n"
 
 echo -e $stunnelconf | stunnel -fd 0 &
 
-# Grab the pid
-stunnelpid=$!
 # Sleep a moment to let the connection establish
 sleep 1 
 # Now call redis-cli for the user to interact with
 redis-cli -p $LOCALPORT -a ${pass}
 # Once they leave that, kill the stunnel
-kill $stunnelpid
+ps -ef | grep stunnel | grep -v grep | awk '{print $2}' | xargs kill
 
 
