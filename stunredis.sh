@@ -17,7 +17,7 @@
 #    limitations under the License.
 
 DATABASE_URL=$1
-LOCALPORT=${2:-6830}
+REMOTEPORT=${2:-6830}
 
 # This is the location of the validation chain file
 lechain=./lechain.pem
@@ -32,8 +32,10 @@ userpass="`echo $url | grep @ | cut -d@ -f1`"
 pass=`echo $userpass | grep : | cut -d: -f2`
 if [ -n "$pass" ]; then
     user=`echo $userpass | grep : | cut -d: -f1`
+    AUTH=" -a ${pass}"
 else
     user=$userpass
+    AUTH=""
 fi
 hostport=`echo $url | sed -e s,$userpass@,,g | cut -d/ -f1`
 port=`echo $hostport | grep : | cut -d: -f2`
@@ -48,7 +50,7 @@ stunnelconf=""
 stunnelconf+=$"foreground=yes\n" 
 stunnelconf+=$"[redis-cli]\n"
 stunnelconf+=$"client=yes\n"
-stunnelconf+=$"accept=127.0.0.1:$LOCALPORT\n"
+stunnelconf+=$"accept=${HOME}/${host}.${REMOTEPORT}.${BASHPID}.sock\n"
 stunnelconf+=$"verifyChain=yes\n"
 stunnelconf+=$"checkHost=$host\n"
 stunnelconf+=$"CAfile=$lechain\n"
@@ -65,8 +67,6 @@ stunnelpid=$!
 # Sleep a moment to let the connection establish
 sleep 1 
 # Now call redis-cli for the user to interact with
-redis-cli -p $LOCALPORT -a ${pass}
+redis-cli ${AUTH} -s ${HOME}/${host}.${REMOTEPORT}.${BASHPID}.sock
 # Once they leave that, kill the stunnel
 kill $stunnelpid
-
-
