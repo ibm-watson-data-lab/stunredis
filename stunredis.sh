@@ -32,8 +32,10 @@ userpass="`echo $url | grep @ | cut -d@ -f1`"
 pass=`echo $userpass | grep : | cut -d: -f2`
 if [ -n "$pass" ]; then
     user=`echo $userpass | grep : | cut -d: -f1`
+    AUTH=" -a ${pass}"
 else
     user=$userpass
+    AUTH=""
 fi
 hostport=`echo $url | sed -e s,$userpass@,,g | cut -d/ -f1`
 port=`echo $hostport | grep : | cut -d: -f2`
@@ -65,8 +67,6 @@ stunnelpid=$!
 # Sleep a moment to let the connection establish
 sleep 1 
 # Now call redis-cli for the user to interact with
-redis-cli -s ${HOME}/${host}.${REMOTEPORT}.${BASHPID}.sock
+redis-cli ${AUTH} -s ${HOME}/${host}.${REMOTEPORT}.${BASHPID}.sock
 # Once they leave that, kill the stunnel
 kill $stunnelpid
-
-
