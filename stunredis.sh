@@ -16,11 +16,13 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
 DATABASE_URL=$1
 LOCALPORT=${2:-6830}
 
 # This is the location of the validation chain file
-lechain=./lechain.pem
+lechain=${DIR}/lechain.pem
 
 # URL parsing based on https://stackoverflow.com/a/17287984
 # extract the protocol
@@ -45,7 +47,7 @@ fi
 
 # Now we create our configuration file as a variable
 stunnelconf=""
-stunnelconf+=$"foreground=yes\n" 
+stunnelconf+=$"foreground=yes\n"
 stunnelconf+=$"[redis-cli]\n"
 stunnelconf+=$"client=yes\n"
 stunnelconf+=$"accept=127.0.0.1:$LOCALPORT\n"
@@ -63,10 +65,8 @@ echo -e $stunnelconf | stunnel -fd 0 &
 # Grab the pid
 stunnelpid=$!
 # Sleep a moment to let the connection establish
-sleep 1 
+sleep 1
 # Now call redis-cli for the user to interact with
 redis-cli -p $LOCALPORT -a ${pass}
 # Once they leave that, kill the stunnel
 kill $stunnelpid
-
-
