@@ -17,41 +17,46 @@
 #    limitations under the License.
 
 DATABASE_URL=$1
-LOCALPORT=${2:-6830}
+
+if [ -z "$1" ]; then
+  echo "stunredis rediss://redis.example.com:6379 [localbindport]"
+  exit 1
+fi
 
 # This is the location of the validation chain file
-lechain=./lechain.pem
+cabundle=/etc/pki/tls/certs/ca-bundle.crt
 
 # URL parsing based on https://stackoverflow.com/a/17287984
 # extract the protocol
-proto="`echo $DATABASE_URL | grep '://' | sed -e's,^\(.*://\).*,\1,g'`"
+proto="`echo "$DATABASE_URL" | grep '://' | sed -e's,^\(.*://\).*,\1,g'`"
 # remove the protocol
-url=`echo $DATABASE_URL | sed -e s,$proto,,g`
+url=`echo "$DATABASE_URL" | sed -e s,$proto,,g`
 # extract the user and password (if any)
-userpass="`echo $url | grep @ | cut -d@ -f1`"
-pass=`echo $userpass | grep : | cut -d: -f2`
+userpass="`echo "$url" | grep @ | cut -d@ -f1`"
+pass=`echo "$userpass" | grep : | cut -d: -f2-`
 if [ -n "$pass" ]; then
-    user=`echo $userpass | grep : | cut -d: -f1`
+    user=`echo "$userpass" | grep : | cut -d: -f1`
 else
-    user=$userpass
+    user="$userpass"
 fi
-hostport=`echo $url | sed -e s,$userpass@,,g | cut -d/ -f1`
-port=`echo $hostport | grep : | cut -d: -f2`
+hostport=${url#"$userpass@"}
+port=`echo "$hostport" | grep : | cut -d: -f2`
 if [ -n "$port" ]; then
-    host=`echo $hostport | grep : | cut -d: -f1`
+    host=`echo "$hostport" | grep : | cut -d: -f1`
 else
-    host=$hostport
+    host="$hostport"
 fi
 
 # Now we create our configuration file as a variable
+acceptsock=$"${HOME}/.redis.${BASHPID}.sock"
 stunnelconf=""
-stunnelconf+=$"foreground=yes\n" 
+stunnelconf+=$"foreground=yes\n"
+stunnelconf+=$"pid=\n"
 stunnelconf+=$"[redis-cli]\n"
 stunnelconf+=$"client=yes\n"
-stunnelconf+=$"accept=127.0.0.1:$LOCALPORT\n"
-stunnelconf+=$"verifyChain=yes\n"
-stunnelconf+=$"checkHost=$host\n"
-stunnelconf+=$"CAfile=$lechain\n"
+stunnelconf+=$"accept=$acceptsock\n"
+stunnelconf+=$"CAfile=$cabundle\n"
+stunnelconf+=$"verify=2\n"
 stunnelconf+=$"connect=$hostport\n"
 
 # We expand that out in echo and feed the result to stunnel
@@ -62,11 +67,20 @@ echo -e $stunnelconf | stunnel -fd 0 &
 
 # Grab the pid
 stunnelpid=$!
-# Sleep a moment to let the connection establish
-sleep 1 
-# Now call redis-cli for the user to interact with
-redis-cli -p $LOCALPORT -a ${pass}
-# Once they leave that, kill the stunnel
-kill $stunnelpid
-
-
+# Sleep a moment to let stunnel start
+sleep 1
+# Assuming it's running...
+if kill -0 $stunnelpid &>/dev/null; then
+  # Now call redis-cli for the user to interact with
+  if [[ -n "${pass}" ]]; then
+    redis-cli -s "$acceptsock" -a "${pass}"
+  else
+    redis-cli -s "$acceptsock"
+  fi
+  # Once they leave that, kill the stunnel
+  kill $stunnelpid &>/dev/null
+  wait $stunnelpid
+  exit 0
+fi
+echo "stunnel faild to start" 1>&2
+exit 1
